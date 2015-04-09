@@ -41,27 +41,27 @@ while has_more_groups:
             for stream in streams_response['logStreams']:
                 # Create the file.
                 file = directory + os.path.sep + stream['logStreamName'] + '.log'
-                log_file = open(file, 'w')
-                print('Creating log file ' + file)
+                log_file = None
 
-                more_log_events = False
-                try:
-                    # Pulling in the log events.
-                    log_events = cwlogs.get_log_events(logGroup['logGroupName'], stream['logStreamName'], startTime, None, None, None, True)
-                    more_log_events = True
-                    count = 1
-                except:
-                    print('Failure pulling log events.')
+                more_log_events = stream['storedBytes'] > 0 and stream['lastEventTimestamp'] > startTime
+
+                if more_log_events:
+                    try:
+                        # Pulling in the log events.
+                        log_events = cwlogs.get_log_events(logGroup['logGroupName'], stream['logStreamName'], startTime, None, None, None, True)
+                        print('Creating log file ' + file)
+                        log_file = open(file, 'w')
+                    except:
+                        print('Failure pulling log events.')
                                 
-                while more_log_events and count < 5:
+                while more_log_events:
                     more_log_events = False
-                    count = count + 1
-                    
+
                     for log_line in log_events['events']:
                         try:
                             log_file.write(log_line['message'])
                         except:
-                                log_file.write('Bad line read from logs.')
+                            log_file.write('Bad line read from logs.')
                 
                     if 'nextForwardToken' in log_events:
                         try:
@@ -72,7 +72,8 @@ while has_more_groups:
                             print('Failure pulling log events.')
                             more_log_events = False
             
-                log_file.close()
+                if log_file:
+                    log_file.close()
             
             if 'nextToken' in streams_response:
                 time.sleep(2)
