@@ -3,22 +3,30 @@
 
 from boto import logs
 from boto.logs.exceptions import LimitExceededException
+import argparse
 import tempfile
 import time
 import os
 import shutil
 
+parser = argparse.ArgumentParser(description='An AWS log file extractor')
+parser.add_argument('--log-prefix', '-l', help='The prefix of the log groups to include in the retrieval.', default=None)
+parser.add_argument('--minutes', '-m', help='Amount of minutes to include in output (default is 20).', type=int, default=20)
+parser.add_argument('--folder', '-f', help='The parent folder to use for all retrieved output (default is '+tempfile.gettempdir()+').', default=tempfile.gettempdir())
+args = parser.parse_args()
+
+if not os.path.exists(args.folder):
+    print('Not a valid path: ' + args.folder)
+    exit()
+
 # Important variables which control log group collection
 cwlogs = logs.connect_to_region('us-east-1')
-log_prefix = 'Green'
-parent_path = tempfile.gettempdir()
-minutes_back = 20
 
 # Computing how much log data to bring back.
-startTime = int(time.time() * 1000) - (minutes_back * 60 * 1000)
+startTime = int(time.time() * 1000) - (abs(args.minutes) * 60 * 1000)
 
 # Retrieving initial list of groups to use.
-group_response = cwlogs.describe_log_groups(log_prefix, None, None)
+group_response = cwlogs.describe_log_groups(args.log_prefix, None, None)
 has_more_groups = True
 
 def getLogEvents(logGroup, logStream, startTime, nextForwardToken = None):
@@ -41,9 +49,9 @@ while has_more_groups:
     
     # Loop over individual groups
     for logGroup in group_response['logGroups']:
-        
+
         # Ascertain directory to create log files in.
-        directory = parent_path + os.path.sep + logGroup['logGroupName']
+        directory = args.folder + os.path.sep + logGroup['logGroupName']
         if os.path.exists(directory):
             print('Removing existing contents in ' + directory)
             shutil.rmtree(directory)
@@ -95,7 +103,7 @@ while has_more_groups:
                 has_more_streams = True
         
     if 'nextToken' in group_response:
-        group_response = cwlogs.describe_log_groups(log_prefix, group_response['nextToken'], None)
+        group_response = cwlogs.describe_log_groups(args.log_prefix, group_response['nextToken'], None)
         has_more_groups = True
     
 print()
