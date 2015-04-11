@@ -82,16 +82,12 @@ while has_more_groups:
                     for log_line in log_events['events']:
                         try:
                             # If we have seen the last message, there's no more to process
-                            if stream['lastEventTimestamp'] == log_line['timestamp']:
+                            if stream['lastEventTimestamp'] <= log_line['timestamp']:
                                 more_log_events = False
                             log_file.write(log_line['message'])
                         except:
                             log_file.write('Bad line read from logs.')
-                
-                    # When the forward and backward tokens match, there are no more pages to fetch.
-                    if more_log_events:
-                        more_log_events = log_events['nextForwardToken'][2:] != log_events['nextBackwardToken'][2:]
-                
+               
                     if more_log_events:
                         log_events = getLogEvents(logGroup['logGroupName'], stream['logStreamName'], startTime, log_events['nextBackwardToken'])
             
