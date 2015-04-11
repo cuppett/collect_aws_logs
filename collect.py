@@ -1,4 +1,5 @@
 from boto import logs
+from boto.logs.exceptions import LimitExceededException
 import tempfile
 import time
 import os
@@ -16,6 +17,16 @@ startTime = int(time.time() * 1000) - (minutes_back * 60 * 1000)
 # Retrieving initial list of groups to use.
 group_response = cwlogs.describe_log_groups(log_prefix, None, None)
 has_more_groups = True
+
+def getLogEvents(logGroup, logStream, startTime, nextForwardToken = None):
+    log_events = None
+    while not log_events:
+        try:
+            log_events = cwlogs.get_log_events(logGroup, logStream, startTime, None, nextForwardToken, None, True)
+        except LimitExceededException:
+            log_events = None
+            time.sleep(1)
+    return log_events
 
 # Loop over initial group response
 while has_more_groups:
@@ -42,41 +53,37 @@ while has_more_groups:
                 # Create the file.
                 file = directory + os.path.sep + stream['logStreamName'] + '.log'
                 log_file = None
+                log_events = None
 
                 more_log_events = stream['storedBytes'] > 0 and stream['lastEventTimestamp'] > startTime
 
                 if more_log_events:
-                    try:
-                        # Pulling in the log events.
-                        log_events = cwlogs.get_log_events(logGroup['logGroupName'], stream['logStreamName'], startTime, None, None, None, True)
-                        print('Creating log file ' + file)
-                        log_file = open(file, 'w')
-                    except:
-                        print('Failure pulling log events.')
+                    log_events = getLogEvents(logGroup['logGroupName'], stream['logStreamName'], startTime)
+                    print('Creating log file ' + file)
+                    log_file = open(file, 'w')
                                 
                 while more_log_events:
-                    more_log_events = False
 
                     for log_line in log_events['events']:
                         try:
+                            # If we have seen the last message, there's no more to process
+                            if stream['lastEventTimestamp'] == log_line['timestamp']:
+                                more_log_events = False
                             log_file.write(log_line['message'])
                         except:
                             log_file.write('Bad line read from logs.')
                 
-                    if 'nextForwardToken' in log_events:
-                        try:
-                            time.sleep(2)
-                            log_events = cwlogs.get_log_events(logGroup['logGroupName'], stream['logStreamName'], startTime, None, log_events['nextForwardToken'], None, True)
-                            more_log_events = True
-                        except:
-                            print('Failure pulling log events.')
-                            more_log_events = False
+                    # When the forward and backward tokens match, there are no more pages to fetch.
+                    if more_log_events:
+                        more_log_events = log_events['nextForwardToken'][2:] != log_events['nextBackwardToken'][2:]
+                
+                    if more_log_events:
+                        log_events = getLogEvents(logGroup['logGroupName'], stream['logStreamName'], startTime, log_events['nextBackwardToken'])
             
                 if log_file:
                     log_file.close()
             
             if 'nextToken' in streams_response:
-                time.sleep(2)
                 streams_response = cwlogs.describe_log_streams(logGroup['logGroupName'], streams_response['nextToken'], None)
                 has_more_streams = True
         
