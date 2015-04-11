@@ -1,3 +1,6 @@
+# Copyright (c) 2015 Stephen Cuppett <stephen.cuppett@sas.com>
+# All rights reserved
+
 from boto import logs
 from boto.logs.exceptions import LimitExceededException
 import tempfile
@@ -19,6 +22,10 @@ group_response = cwlogs.describe_log_groups(log_prefix, None, None)
 has_more_groups = True
 
 def getLogEvents(logGroup, logStream, startTime, nextForwardToken = None):
+    """
+    Handles fetching the next batch of log events. Will account for rate limits
+    and continue trying until it can get through.
+    """
     log_events = None
     while not log_events:
         try:
