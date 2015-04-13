@@ -9,7 +9,7 @@ import time
 import os
 import shutil
 
-parser = argparse.ArgumentParser(description='An AWS log file extractor')
+parser = argparse.ArgumentParser(description='An AWS log file extractor', epilog=' - For Steven')
 parser.add_argument('--log-prefix', '-l', help='The prefix of the log groups to include in the retrieval.', default=None)
 parser.add_argument('--minutes', '-m', help='Amount of minutes to include in output (default is 20).', type=int, default=20)
 parser.add_argument('--folder', '-f', help='The parent folder to use for all retrieved output (default is '+tempfile.gettempdir()+').', default=tempfile.gettempdir())
@@ -88,6 +88,9 @@ while has_more_groups:
                         except:
                             log_file.write('Bad line read from logs.')
                
+                    if log_events['nextForwardToken'][2:] == log_events['nextBackwardToken'][2:]:
+                        more_log_events = False
+               
                     if more_log_events:
                         log_events = getLogEvents(logGroup['logGroupName'], stream['logStreamName'], startTime, log_events['nextBackwardToken'])
             
@@ -101,6 +104,3 @@ while has_more_groups:
     if 'nextToken' in group_response:
         group_response = cwlogs.describe_log_groups(args.log_prefix, group_response['nextToken'], None)
         has_more_groups = True
-    
-print()
-print(' - For Steven')
