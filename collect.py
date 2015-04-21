@@ -70,7 +70,7 @@ while has_more_groups:
                 log_file = None
                 log_events = None
 
-                more_log_events = stream['storedBytes'] > 0 and stream['lastEventTimestamp'] > startTime
+                more_log_events = stream['lastEventTimestamp'] > startTime
 
                 if more_log_events:
                     log_events = getLogEvents(logGroup['logGroupName'], stream['logStreamName'], startTime)
