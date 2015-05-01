@@ -85,6 +85,7 @@ while has_more_groups:
                             if stream['lastEventTimestamp'] <= log_line['timestamp']:
                                 more_log_events = False
                             log_file.write(log_line['message'])
+                            log_file.write("\n")
                         except:
                             log_file.write('Bad line read from logs.')
                
